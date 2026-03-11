@@ -1,23 +1,23 @@
-# plasmactl-chassis
+# plasmactl-topology
 
-A [Launchr](https://github.com/launchrctl/launchr) plugin for [Plasmactl](https://github.com/plasmash/plasmactl) that manages the chassis structure for Plasma platforms.
+A [Launchr](https://github.com/launchrctl/launchr) plugin for [Plasmactl](https://github.com/plasmash/plasmactl) that manages the topology structure for Plasma platforms.
 
 ## Overview
 
-`plasmactl-chassis` manages the platform's "skeleton" - the structural framework where applications and flows attach. The chassis maps logical architecture to physical resources, ensuring components get appropriate compute resources (GPU for AI, storage for data, etc.).
+`plasmactl-topology` manages the platform's "skeleton" - the structural framework where applications and agents attach. The topology maps logical architecture to physical resources, ensuring components get appropriate compute resources (GPU for AI, storage for data, etc.).
 
 ## Features
 
-- **Chassis Structure**: Hierarchical definition of platform sections
-- **Section Management**: Add and remove chassis sections
-- **Node Visibility**: See which nodes are allocated to each section
-- **Component Visibility**: See which components are attached to each section
+- **Topology Structure**: Hierarchical definition of platform zones
+- **Zone Management**: Add and remove zones
+- **Node Visibility**: See which nodes are allocated to each zone
+- **Component Visibility**: See which components are attached to each zone
 
 ## Concepts
 
-### Chassis Structure
+### Topology Structure
 
-The chassis is defined in `chassis.yaml` as a hierarchical structure:
+The topology is defined in `topology.yaml` as a hierarchical structure:
 
 ```yaml
 platform:
@@ -37,42 +37,42 @@ platform:
     - knowledge
 ```
 
-Each path (e.g., `platform.foundation.cluster.control`) represents a chassis section that:
+Each path (e.g., `platform.foundation.cluster.control`) represents a zone that:
 - Can have nodes allocated to it
 - Can have components attached to it
 - Can have specific configuration in group_vars
 
 ## Commands
 
-### chassis:list
+### topology:list
 
-List chassis sections from `chassis.yaml`:
+List zones from `topology.yaml`:
 
 ```bash
-# List all sections (flat)
-plasmactl chassis:list
+# List all zones (flat)
+plasmactl topology:list
 
 # List as tree
-plasmactl chassis:list --tree
+plasmactl topology:list --tree
 
-# List section and its children
-plasmactl chassis:list platform.interaction
-plasmactl chassis:list platform.foundation.cluster --tree
+# List zone and its children
+plasmactl topology:list platform.interaction
+plasmactl topology:list platform.foundation.cluster --tree
 ```
 
 Options:
 - `-t, --tree`: Show as tree instead of flat list
 
-### chassis:show
+### topology:show
 
-Show details for a chassis section:
+Show details for a zone:
 
 ```bash
-# Show section details
-plasmactl chassis:show platform.interaction.observability
+# Show zone details
+plasmactl topology:show platform.interaction.observability
 
 # Filter nodes by platform
-plasmactl chassis:show platform.foundation.cluster.control --platform dev
+plasmactl topology:show platform.foundation.cluster.control --platform dev
 ```
 
 Options:
@@ -82,21 +82,21 @@ Output includes:
 - Allocated nodes (from `inst/<platform>/nodes/`)
 - Attached components (from layer playbooks)
 
-### chassis:add
+### topology:add
 
-Add a new chassis section:
+Add a new zone:
 
 ```bash
-plasmactl chassis:add platform.interaction.analytics
-plasmactl chassis:add platform.cognition.ml.training
+plasmactl topology:add platform.interaction.analytics
+plasmactl topology:add platform.cognition.ml.training
 ```
 
-### chassis:remove
+### topology:remove
 
-Remove a chassis section:
+Remove a zone:
 
 ```bash
-plasmactl chassis:remove platform.interaction.legacy
+plasmactl topology:remove platform.interaction.legacy
 ```
 
 **Safety**: Fails if nodes are allocated or components are attached. Use `node:allocate` and `component:detach` first to clean up.
@@ -104,7 +104,7 @@ plasmactl chassis:remove platform.interaction.legacy
 ## Project Structure
 
 ```
-plasmactl-chassis/
+plasmactl-topology/
 ├── plugin.go                        # Plugin registration
 ├── actions/
 │   ├── add/
@@ -120,17 +120,17 @@ plasmactl-chassis/
 │       ├── show.yaml
 │       └── show.go
 └── internal/
-    └── chassis/                     # Chassis operations
-        └── chassis.go
+    └── topology/                    # Topology operations
+        └── topology.go
 ```
 
 ## Directory Structure
 
-The chassis interacts with several locations:
+The topology interacts with several locations:
 
 ```
 .
-├── chassis.yaml                    # Chassis definition
+├── topology.yaml                   # Topology definition
 ├── inst/
 │   └── <platform>/
 │       └── nodes/
@@ -139,7 +139,7 @@ The chassis interacts with several locations:
     └── <layer>/
         ├── <layer>.yaml            # Component attachments (playbooks)
         └── cfg/
-            └── <chassis.section>/  # Section-specific configuration
+            └── <zone>/             # Zone-specific configuration
                 ├── vars.yaml
                 └── vault.yaml
 ```
@@ -147,35 +147,35 @@ The chassis interacts with several locations:
 ## Workflow Example
 
 ```bash
-# 1. View current chassis structure
-plasmactl chassis:list --tree
+# 1. View current topology structure
+plasmactl topology:list --tree
 
-# 2. Add a new section for analytics
-plasmactl chassis:add platform.interaction.analytics
+# 2. Add a new zone for analytics
+plasmactl topology:add platform.interaction.analytics
 
-# 3. Allocate nodes to the new section
+# 3. Allocate nodes to the new zone
 plasmactl node:allocate node001 platform.interaction.analytics
 
-# 4. Attach a component to the section
+# 4. Attach a component to the zone
 plasmactl component:attach interaction.applications.analytics platform.interaction.analytics
 
 # 5. Verify the setup
-plasmactl chassis:show platform.interaction.analytics
+plasmactl topology:show platform.interaction.analytics
 
-# 6. Remove a legacy section (after cleanup)
+# 6. Remove a legacy zone (after cleanup)
 plasmactl node:allocate node001 platform.interaction.legacy-
 plasmactl component:detach interaction.applications.old platform.interaction.legacy
-plasmactl chassis:remove platform.interaction.legacy
+plasmactl topology:remove platform.interaction.legacy
 ```
 
 ## Related Commands
 
 | Plugin | Command | Purpose |
 |--------|---------|---------|
-| plasmactl-node | `node:allocate` | Allocate nodes to chassis sections |
-| plasmactl-component | `component:attach` | Attach components to chassis sections |
-| plasmactl-component | `component:detach` | Detach components from chassis sections |
-| plasmactl-platform | `platform:deploy` | Deploy to chassis sections |
+| plasmactl-node | `node:allocate` | Allocate nodes to zones |
+| plasmactl-component | `component:attach` | Attach components to zones |
+| plasmactl-component | `component:detach` | Detach components from zones |
+| plasmactl-platform | `platform:deploy` | Deploy to zones |
 
 ## Documentation
 
