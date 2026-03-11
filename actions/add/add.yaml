@@ -1,11 +1,11 @@
 runtime: plugin
 action:
   title: Add
-  description: Add a chassis path
+  description: Add a zone path
   arguments:
-    - name: chassis
-      title: Chassis
-      description: Chassis path to add (e.g., platform.layer.sublayer)
+    - name: zone
+      title: Zone
+      description: Zone path to add (e.g., platform.layer.sublayer)
       required: true
   options:
     - name: dir
@@ -17,12 +17,12 @@ action:
     - name: force
       shorthand: f
       title: Force
-      description: Skip error if chassis path already exists
+      description: Skip error if zone path already exists
       type: boolean
       default: false
   result:
     type: object
     properties:
-      chassis:
+      zone:
         type: string
-        description: The chassis path that was added
+        description: The zone path that was added

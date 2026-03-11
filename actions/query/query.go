@@ -5,17 +5,17 @@ import (
 	"sort"
 
 	"github.com/launchrctl/launchr/pkg/action"
-	"github.com/plasmash/plasmactl-chassis/pkg/chassis"
+	"github.com/plasmash/plasmactl-topology/pkg/topology"
 	"github.com/plasmash/plasmactl-component/pkg/component"
 	"github.com/plasmash/plasmactl-node/pkg/node"
 )
 
-// QueryResult is the structured output for chassis:query
+// QueryResult is the structured output for topology:query
 type QueryResult struct {
 	Paths []string `json:"paths"`
 }
 
-// Query implements the chassis:query command
+// Query implements the topology:query command
 type Query struct {
 	action.WithLogger
 	action.WithTerm
@@ -29,13 +29,13 @@ type Query struct {
 
 // Execute runs the query action
 func (q *Query) Execute() error {
-	// Load chassis for distribution computation
-	c, err := chassis.Load(q.Dir)
+	// Load topology for distribution computation
+	t, err := topology.Load(q.Dir)
 	if err != nil {
 		return err
 	}
 
-	var chassisPaths []string
+	var zonePaths []string
 
 	// Search based on kind or search both when unspecified
 	searchNode := q.Kind == "" || q.Kind == "node"
@@ -54,38 +54,38 @@ func (q *Query) Execute() error {
 
 		for _, nodes := range nodesByPlatform {
 			// Compute effective allocations for all nodes in this platform
-			allocations := nodes.Allocations(c)
+			allocations := nodes.Allocations(t)
 
 			for _, n := range nodes {
 				if n.Hostname == q.Identifier {
 					// Use effective allocations (after distribution)
-					chassisPaths = append(chassisPaths, allocations[n.Hostname]...)
+					zonePaths = append(zonePaths, allocations[n.Hostname]...)
 				}
 			}
 		}
 	}
 
-	// Search in attachments (components) — always search when applicable, no short-circuit
+	// Search in attachments (components) -- always search when applicable, no short-circuit
 	if searchComponent {
 		components, err := component.LoadFromPlaybooks(q.Dir)
 		if err != nil {
 			q.Log().Debug("Failed to load components", "error", err)
 		}
 
-		attachmentsMap := components.Attachments(c)
+		attachmentsMap := components.Attachments(t)
 		if attached, ok := attachmentsMap[q.Identifier]; ok {
-			chassisPaths = append(chassisPaths, attached...)
+			zonePaths = append(zonePaths, attached...)
 		}
 	}
 
-	if len(chassisPaths) == 0 {
-		return fmt.Errorf("no chassis paths found for %q (searched as %s)", q.Identifier, q.searchDescription())
+	if len(zonePaths) == 0 {
+		return fmt.Errorf("no zone paths found for %q (searched as %s)", q.Identifier, q.searchDescription())
 	}
 
 	// Remove duplicates and sort
 	seen := make(map[string]bool)
 	var unique []string
-	for _, p := range chassisPaths {
+	for _, p := range zonePaths {
 		if !seen[p] {
 			seen[p] = true
 			unique = append(unique, p)

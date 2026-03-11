@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/launchrctl/launchr/pkg/action"
-	"github.com/plasmash/plasmactl-chassis/internal/chassis"
+	"github.com/plasmash/plasmactl-topology/internal/topology"
 )
 
-// RenameResult is the structured result of chassis:rename.
+// RenameResult is the structured result of topology:rename.
 type RenameResult struct {
 	Old                string   `json:"old"`
 	New                string   `json:"new"`
@@ -16,7 +16,7 @@ type RenameResult struct {
 	UpdatedAllocations []string `json:"updated_allocations,omitempty"`
 }
 
-// Rename implements the chassis:rename command
+// Rename implements the topology:rename command
 type Rename struct {
 	action.WithLogger
 	action.WithTerm
@@ -36,42 +36,42 @@ func (r *Rename) Result() any {
 
 // Execute runs the rename action
 func (r *Rename) Execute() error {
-	c, err := chassis.Load(r.Dir)
+	t, err := topology.Load(r.Dir)
 	if err != nil {
 		return err
 	}
 
-	if !c.Exists(r.Old) {
-		return fmt.Errorf("chassis %q does not exist", r.Old)
+	if !t.Exists(r.Old) {
+		return fmt.Errorf("zone %q does not exist", r.Old)
 	}
 
-	if c.Exists(r.New) {
-		return fmt.Errorf("chassis %q already exists", r.New)
+	if t.Exists(r.New) {
+		return fmt.Errorf("zone %q already exists", r.New)
 	}
 
 	if r.DryRun {
 		return r.executeDryRun()
 	}
 
-	// Rename in chassis.yaml
-	if err := c.Rename(r.Old, r.New); err != nil {
-		return fmt.Errorf("failed to rename chassis path: %w", err)
+	// Rename in topology.yaml
+	if err := t.Rename(r.Old, r.New); err != nil {
+		return fmt.Errorf("failed to rename zone path: %w", err)
 	}
 
-	if err := c.Save(r.Dir); err != nil {
+	if err := t.Save(r.Dir); err != nil {
 		return err
 	}
 
 	// Update attachments
-	updatedAttachments, err := chassis.UpdateAttachments(r.Dir, r.Old, r.New)
+	updatedAttachments, err := topology.UpdateAttachments(r.Dir, r.Old, r.New)
 	if err != nil {
-		r.Term().Warning().Printfln("Chassis renamed but failed to update attachments: %s", err)
+		r.Term().Warning().Printfln("Zone renamed but failed to update attachments: %s", err)
 	}
 
 	// Update allocations
-	updatedAllocations, err := chassis.UpdateAllocations(r.Dir, r.Old, r.New)
+	updatedAllocations, err := topology.UpdateAllocations(r.Dir, r.Old, r.New)
 	if err != nil {
-		r.Term().Warning().Printfln("Chassis renamed but failed to update allocations: %s", err)
+		r.Term().Warning().Printfln("Zone renamed but failed to update allocations: %s", err)
 	}
 
 	r.result = &RenameResult{
@@ -101,10 +101,10 @@ func (r *Rename) Execute() error {
 // executeDryRun shows what would change without modifying any files.
 func (r *Rename) executeDryRun() error {
 	r.Term().Info().Println("[dry-run] No changes will be made")
-	r.Term().Printfln("  chassis.yaml: %s -> %s", r.Old, r.New)
+	r.Term().Printfln("  topology.yaml: %s -> %s", r.Old, r.New)
 
 	// Find affected attachment files
-	attachments, err := chassis.LoadAttachments(r.Dir, r.Old)
+	attachments, err := topology.LoadAttachments(r.Dir, r.Old)
 	if err != nil {
 		r.Log().Debug("Failed to load attachments", "error", err)
 	}
@@ -119,14 +119,14 @@ func (r *Rename) executeDryRun() error {
 	}
 
 	// Find affected allocation files
-	nodesByPlatform, err := chassis.LoadNodesByPlatform(r.Dir)
+	nodesByPlatform, err := topology.LoadNodesByPlatform(r.Dir)
 	if err != nil {
 		r.Log().Debug("Failed to load nodes", "error", err)
 	}
 
 	var affectedNodeFiles []string
 	for platform, nodes := range nodesByPlatform {
-		for _, n := range chassis.NodesForChassis(nodes, r.Old) {
+		for _, n := range topology.NodesForZone(nodes, r.Old) {
 			affectedNodeFiles = append(affectedNodeFiles, fmt.Sprintf("inst/%s/nodes/%s.yaml", platform, n.Hostname))
 		}
 	}

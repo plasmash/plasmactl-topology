@@ -1,11 +1,11 @@
 runtime: plugin
 action:
   title: List
-  description: List chassis paths
+  description: List zone paths
   arguments:
-    - name: chassis
-      title: Chassis
-      description: Chassis path to filter (shows path and children)
+    - name: zone
+      title: Zone
+      description: Zone path to filter (shows path and children)
       required: false
   options:
     - name: dir
@@ -23,20 +23,20 @@ action:
   result:
     type: object
     properties:
-      chassis:
+      zones:
         type: array
-        description: List of chassis paths
+        description: List of zone paths
         items:
           type: string
       tree:
         type: array
-        description: Chassis paths enriched with node/component relations (only in tree mode)
+        description: Zone paths enriched with node/component relations (only in tree mode)
         items:
           type: object
           properties:
             path:
               type: string
-              description: Chassis path
+              description: Zone path
             nodes:
               type: array
               description: Nodes allocated to this path

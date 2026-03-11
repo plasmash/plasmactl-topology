@@ -1,7 +1,7 @@
 runtime: plugin
 action:
   title: Query
-  description: Find chassis paths for node/component
+  description: Find zone paths for node/component
   arguments:
     - name: identifier
       title: Identifier
@@ -23,11 +23,11 @@ action:
       default: ""
   result:
     type: object
-    description: Query result containing matching chassis paths
+    description: Query result containing matching zone paths
     properties:
       paths:
         type: array
-        description: List of chassis paths matching the query
+        description: List of zone paths matching the query
         items:
           type: string
     required:

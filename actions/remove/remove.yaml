@@ -1,11 +1,11 @@
 runtime: plugin
 action:
   title: Remove
-  description: Remove a chassis path
+  description: Remove a zone path
   arguments:
-    - name: chassis
-      title: Chassis
-      description: Chassis path to remove
+    - name: zone
+      title: Zone
+      description: Zone path to remove
       required: true
   options:
     - name: dir
@@ -22,19 +22,19 @@ action:
   result:
     type: object
     properties:
-      chassis:
+      zone:
         type: string
-        description: The chassis path that was removed
+        description: The zone path that was removed
       dry_run:
         type: boolean
         description: Whether this was a dry run
       allocated_nodes:
         type: array
-        description: Nodes allocated to this chassis path
+        description: Nodes allocated to this zone path
         items:
           type: string
       attached_components:
         type: array
-        description: Components attached to this chassis path
+        description: Components attached to this zone path
         items:
           type: string

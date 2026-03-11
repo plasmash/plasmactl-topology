@@ -3,9 +3,9 @@ action:
   title: Show
   description: Show allocations and attachments
   arguments:
-    - name: chassis
-      title: Chassis
-      description: Chassis path (optional, shows all if omitted)
+    - name: zone
+      title: Zone
+      description: Zone path (optional, shows all if omitted)
   options:
     - name: dir
       shorthand: d
@@ -29,9 +29,9 @@ action:
   result:
     type: object
     properties:
-      chassis:
+      zone:
         type: string
-        description: Filtered chassis path (if specified)
+        description: Filtered zone path (if specified)
       allocations:
         type: array
         description: Node allocations
@@ -44,9 +44,9 @@ action:
             platform:
               type: string
               description: Platform instance
-            chassis:
+            zones:
               type: array
-              description: Effective chassis paths for this node
+              description: Effective zone paths for this node
               items:
                 type: string
       attachments:
@@ -61,6 +61,6 @@ action:
             version:
               type: string
               description: Component version
-            chassis:
+            zone:
               type: string
-              description: Chassis path
+              description: Zone path

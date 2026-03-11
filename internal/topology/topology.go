@@ -1,5 +1,5 @@
-// Package chassis provides shared logic for chassis operations
-package chassis
+// Package topology provides shared logic for topology operations
+package topology
 
 import (
 	"fmt"
@@ -9,54 +9,54 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	pkgchassis "github.com/plasmash/plasmactl-chassis/pkg/chassis"
+	pkgtopology "github.com/plasmash/plasmactl-topology/pkg/topology"
 )
 
-// Chassis wraps the public Chassis type with write operations.
-type Chassis struct {
-	*pkgchassis.Chassis
+// Topology wraps the public Topology type with write operations.
+type Topology struct {
+	*pkgtopology.Topology
 }
 
 // Node represents a node file from inst/<platform>/nodes/<hostname>.yaml
 type Node struct {
 	Hostname string   `yaml:"hostname"`
-	Chassis  []string `yaml:"chassis"`
+	Zones    []string `yaml:"zones"`
 }
 
-// Load reads and parses chassis.yaml from the given directory
-func Load(dir string) (*Chassis, error) {
-	pub, err := pkgchassis.Load(dir)
+// Load reads and parses topology.yaml from the given directory
+func Load(dir string) (*Topology, error) {
+	pub, err := pkgtopology.Load(dir)
 	if err != nil {
 		return nil, err
 	}
-	return &Chassis{Chassis: pub}, nil
+	return &Topology{Topology: pub}, nil
 }
 
-// Save writes the chassis configuration to chassis.yaml preserving order
-func (c *Chassis) Save(dir string) error {
-	path := filepath.Join(dir, "chassis.yaml")
-	data, err := yaml.Marshal(c.YAMLNode())
+// Save writes the topology configuration to topology.yaml preserving order
+func (t *Topology) Save(dir string) error {
+	path := filepath.Join(dir, "topology.yaml")
+	data, err := yaml.Marshal(t.YAMLNode())
 	if err != nil {
-		return fmt.Errorf("failed to marshal chassis: %w", err)
+		return fmt.Errorf("failed to marshal topology: %w", err)
 	}
 	return os.WriteFile(path, data, 0644)
 }
 
-// Add adds a new chassis path preserving YAML order
+// Add adds a new zone path preserving YAML order
 // Path format: any dotted path (e.g., platform, platform.bite, platform.foundation.cluster)
-func (c *Chassis) Add(chassisPath string) error {
-	if err := pkgchassis.ValidatePath(chassisPath); err != nil {
+func (t *Topology) Add(zonePath string) error {
+	if err := pkgtopology.ValidatePath(zonePath); err != nil {
 		return err
 	}
 
-	parts := strings.Split(chassisPath, ".")
+	parts := strings.Split(zonePath, ".")
 
-	if c.Exists(chassisPath) {
-		return fmt.Errorf("chassis path %q already exists", chassisPath)
+	if t.Exists(zonePath) {
+		return fmt.Errorf("zone path %q already exists", zonePath)
 	}
 
 	// Work with yaml.Node to preserve order
-	node := c.YAMLNode()
+	node := t.YAMLNode()
 	if node == nil || len(node.Content) == 0 {
 		// Create new document node
 		newNode := &yaml.Node{
@@ -65,7 +65,7 @@ func (c *Chassis) Add(chassisPath string) error {
 				Kind: yaml.MappingNode,
 			}},
 		}
-		c.SetYAMLNode(newNode)
+		t.SetYAMLNode(newNode)
 		node = newNode
 	}
 
@@ -105,10 +105,10 @@ func (c *Chassis) Add(chassisPath string) error {
 	}
 
 	// Also update data for consistency
-	d := c.RawData()
+	d := t.RawData()
 	if d == nil {
 		d = make(map[string]map[string][]interface{})
-		c.SetRawData(d)
+		t.SetRawData(d)
 	}
 	if len(parts) >= 2 {
 		root := parts[0]
@@ -117,7 +117,7 @@ func (c *Chassis) Add(chassisPath string) error {
 			d[root] = make(map[string][]interface{})
 		}
 		if len(parts) > 2 {
-			d[root][layer] = addChassisPath(d[root][layer], parts[2:])
+			d[root][layer] = addZonePath(d[root][layer], parts[2:])
 		} else {
 			// Just ensure the layer exists
 			if d[root][layer] == nil {
@@ -229,19 +229,19 @@ func addPathToSequence(seqNode *yaml.Node, path []string) {
 	})
 }
 
-// Remove removes a chassis path preserving YAML order
-func (c *Chassis) Remove(chassisPath string) error {
-	parts := strings.Split(chassisPath, ".")
-	if len(parts) < 1 || chassisPath == "" {
-		return fmt.Errorf("chassis path cannot be empty")
+// Remove removes a zone path preserving YAML order
+func (t *Topology) Remove(zonePath string) error {
+	parts := strings.Split(zonePath, ".")
+	if len(parts) < 1 || zonePath == "" {
+		return fmt.Errorf("zone path cannot be empty")
 	}
 
-	if !c.Exists(chassisPath) {
-		return fmt.Errorf("chassis path %q does not exist", chassisPath)
+	if !t.Exists(zonePath) {
+		return fmt.Errorf("zone path %q does not exist", zonePath)
 	}
 
 	// Remove from yaml.Node
-	node := c.YAMLNode()
+	node := t.YAMLNode()
 	if node != nil && len(node.Content) > 0 {
 		rootNode := node.Content[0]
 		if rootNode.Kind == yaml.MappingNode {
@@ -299,7 +299,7 @@ func (c *Chassis) Remove(chassisPath string) error {
 	}
 
 	// Also update data for consistency
-	d := c.RawData()
+	d := t.RawData()
 	if d == nil {
 		return nil
 	}
@@ -321,9 +321,9 @@ func (c *Chassis) Remove(chassisPath string) error {
 
 	remaining := parts[2:]
 	var removed bool
-	d[root][layer], removed = removeChassisPath(d[root][layer], remaining)
+	d[root][layer], removed = removeZonePath(d[root][layer], remaining)
 	if !removed {
-		return fmt.Errorf("failed to remove chassis path %q", chassisPath)
+		return fmt.Errorf("failed to remove zone path %q", zonePath)
 	}
 
 	return nil
@@ -378,22 +378,22 @@ func removePathFromSequence(seqNode *yaml.Node, path []string) bool {
 	return false
 }
 
-// GetTree returns the chassis as a tree structure for display
-func (c *Chassis) GetTree() map[string]interface{} {
+// GetTree returns the topology as a tree structure for display
+func (t *Topology) GetTree() map[string]interface{} {
 	tree := make(map[string]interface{})
-	d := c.RawData()
+	d := t.RawData()
 	for root, layers := range d {
-		for layer, chassis := range layers {
-			tree[root+"."+layer] = chassisToTree(chassis)
+		for layer, zones := range layers {
+			tree[root+"."+layer] = zoneToTree(zones)
 		}
 	}
 	return tree
 }
 
-// addChassisPath adds a chassis path to the nested structure
-func addChassisPath(chassis []interface{}, path []string) []interface{} {
+// addZonePath adds a zone path to the nested structure
+func addZonePath(zones []interface{}, path []string) []interface{} {
 	if len(path) == 0 {
-		return chassis
+		return zones
 	}
 
 	name := path[0]
@@ -402,95 +402,95 @@ func addChassisPath(chassis []interface{}, path []string) []interface{} {
 	// If this is the last segment, add as string
 	if len(remaining) == 0 {
 		// Check if it already exists
-		for _, c := range chassis {
-			if str, ok := c.(string); ok && str == name {
-				return chassis
+		for _, z := range zones {
+			if str, ok := z.(string); ok && str == name {
+				return zones
 			}
 		}
-		return append(chassis, name)
+		return append(zones, name)
 	}
 
 	// Need to add nested structure
-	for i, c := range chassis {
-		if m, ok := c.(map[string]interface{}); ok {
+	for i, z := range zones {
+		if m, ok := z.(map[string]interface{}); ok {
 			if sub, exists := m[name]; exists {
 				if subSlice, ok := sub.([]interface{}); ok {
-					m[name] = addChassisPath(subSlice, remaining)
-					return chassis
+					m[name] = addZonePath(subSlice, remaining)
+					return zones
 				}
 			}
 		}
-		if str, ok := c.(string); ok && str == name {
+		if str, ok := z.(string); ok && str == name {
 			// Convert string to map with nested content
-			chassis[i] = map[string]interface{}{
-				name: addChassisPath(nil, remaining),
+			zones[i] = map[string]interface{}{
+				name: addZonePath(nil, remaining),
 			}
-			return chassis
+			return zones
 		}
 	}
 
 	// Create new nested structure
 	newMap := map[string]interface{}{
-		name: addChassisPath(nil, remaining),
+		name: addZonePath(nil, remaining),
 	}
-	return append(chassis, newMap)
+	return append(zones, newMap)
 }
 
-// removeChassisPath removes a chassis path from the nested structure
-func removeChassisPath(chassis []interface{}, path []string) ([]interface{}, bool) {
+// removeZonePath removes a zone path from the nested structure
+func removeZonePath(zones []interface{}, path []string) ([]interface{}, bool) {
 	if len(path) == 0 {
-		return chassis, false
+		return zones, false
 	}
 
 	name := path[0]
 	remaining := path[1:]
 
-	for i, c := range chassis {
+	for i, z := range zones {
 		// Check string match
-		if str, ok := c.(string); ok && str == name && len(remaining) == 0 {
-			return append(chassis[:i], chassis[i+1:]...), true
+		if str, ok := z.(string); ok && str == name && len(remaining) == 0 {
+			return append(zones[:i], zones[i+1:]...), true
 		}
 
 		// Check map match
-		if m, ok := c.(map[string]interface{}); ok {
+		if m, ok := z.(map[string]interface{}); ok {
 			if sub, exists := m[name]; exists {
 				if len(remaining) == 0 {
 					// Remove the entire map entry
 					delete(m, name)
 					if len(m) == 0 {
-						return append(chassis[:i], chassis[i+1:]...), true
+						return append(zones[:i], zones[i+1:]...), true
 					}
-					return chassis, true
+					return zones, true
 				}
 				if subSlice, ok := sub.([]interface{}); ok {
-					newSub, removed := removeChassisPath(subSlice, remaining)
+					newSub, removed := removeZonePath(subSlice, remaining)
 					if removed {
 						m[name] = newSub
-						return chassis, true
+						return zones, true
 					}
 				}
 			}
 		}
 	}
 
-	return chassis, false
+	return zones, false
 }
 
-// chassisToTree converts chassis structure to a displayable tree
-func chassisToTree(chassis []interface{}) interface{} {
-	if len(chassis) == 0 {
+// zoneToTree converts zone structure to a displayable tree
+func zoneToTree(zones []interface{}) interface{} {
+	if len(zones) == 0 {
 		return nil
 	}
 
 	result := make(map[string]interface{})
-	for _, c := range chassis {
-		switch item := c.(type) {
+	for _, z := range zones {
+		switch item := z.(type) {
 		case string:
 			result[item] = nil
 		case map[string]interface{}:
 			for name, sub := range item {
 				if subSlice, ok := sub.([]interface{}); ok {
-					result[name] = chassisToTree(subSlice)
+					result[name] = zoneToTree(subSlice)
 				} else {
 					result[name] = nil
 				}
@@ -569,13 +569,13 @@ func loadNodesFromPlatform(instDir, platform string) ([]Node, error) {
 	return nodes, nil
 }
 
-// NodesForChassis returns nodes allocated to a chassis path or its children
-func NodesForChassis(nodes []Node, chassisPath string) []Node {
+// NodesForZone returns nodes allocated to a zone path or its children
+func NodesForZone(nodes []Node, zonePath string) []Node {
 	var result []Node
 	for _, node := range nodes {
-		for _, c := range node.Chassis {
-			// Match exact chassis path or children
-			if c == chassisPath || strings.HasPrefix(c, chassisPath+".") {
+		for _, c := range node.Zones {
+			// Match exact zone path or children
+			if c == zonePath || strings.HasPrefix(c, zonePath+".") {
 				result = append(result, node)
 				break
 			}
@@ -613,8 +613,8 @@ func LoadNodesByPlatform(dir string) (map[string][]Node, error) {
 	return result, nil
 }
 
-// Rename renames a chassis path preserving YAML order
-func (c *Chassis) Rename(oldPath, newPath string) error {
+// Rename renames a zone path preserving YAML order
+func (t *Topology) Rename(oldPath, newPath string) error {
 	oldParts := strings.Split(oldPath, ".")
 	newParts := strings.Split(newPath, ".")
 
@@ -638,13 +638,13 @@ func (c *Chassis) Rename(oldPath, newPath string) error {
 	}
 
 	// Update yaml.Node
-	node := c.YAMLNode()
+	node := t.YAMLNode()
 	if node != nil && len(node.Content) > 0 {
 		renameInNode(node.Content[0], oldParts, newParts, diffIdx, 0)
 	}
 
 	// Update data for consistency
-	c.updateDataForRename(oldParts, newParts, diffIdx)
+	t.updateDataForRename(oldParts, newParts, diffIdx)
 
 	return nil
 }
@@ -699,8 +699,8 @@ func renameInNode(node *yaml.Node, oldParts, newParts []string, diffIdx, depth i
 }
 
 // updateDataForRename updates data after a rename
-func (c *Chassis) updateDataForRename(oldParts, newParts []string, diffIdx int) {
-	d := c.RawData()
+func (t *Topology) updateDataForRename(oldParts, newParts []string, diffIdx int) {
+	d := t.RawData()
 	if d == nil {
 		return
 	}
@@ -722,31 +722,31 @@ func (c *Chassis) updateDataForRename(oldParts, newParts []string, diffIdx int) 
 			}
 		}
 	default:
-		// Renaming within nested chassis structure
+		// Renaming within nested topology structure
 		root := oldParts[0]
 		layer := oldParts[1]
 		if d[root] != nil && d[root][layer] != nil {
-			d[root][layer] = renameInChassisData(d[root][layer], oldParts[2:], newParts[2:], diffIdx-2)
+			d[root][layer] = renameInTopologyData(d[root][layer], oldParts[2:], newParts[2:], diffIdx-2)
 		}
 	}
 }
 
-// renameInChassisData renames a path segment within the chassis data structure
-func renameInChassisData(chassis []interface{}, oldPath, newPath []string, diffIdx int) []interface{} {
+// renameInTopologyData renames a path segment within the topology data structure
+func renameInTopologyData(zones []interface{}, oldPath, newPath []string, diffIdx int) []interface{} {
 	if len(oldPath) == 0 || diffIdx < 0 {
-		return chassis
+		return zones
 	}
 
 	target := oldPath[0]
 	newName := newPath[0]
 
-	for i, item := range chassis {
+	for i, item := range zones {
 		switch v := item.(type) {
 		case string:
 			if v == target && diffIdx == 0 {
 				// Rename this string entry
-				chassis[i] = newName
-				return chassis
+				zones[i] = newName
+				return zones
 			}
 		case map[string]interface{}:
 			if sub, exists := v[target]; exists {
@@ -754,16 +754,16 @@ func renameInChassisData(chassis []interface{}, oldPath, newPath []string, diffI
 					// Rename the key in this map
 					v[newName] = sub
 					delete(v, target)
-					return chassis
+					return zones
 				}
 				// Recurse deeper
 				if subSlice, ok := sub.([]interface{}); ok {
-					v[target] = renameInChassisData(subSlice, oldPath[1:], newPath[1:], diffIdx-1)
-					return chassis
+					v[target] = renameInTopologyData(subSlice, oldPath[1:], newPath[1:], diffIdx-1)
+					return zones
 				}
 			}
 		}
 	}
 
-	return chassis
+	return zones
 }

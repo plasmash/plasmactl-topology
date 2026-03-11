@@ -1,4 +1,4 @@
-module github.com/plasmash/plasmactl-chassis
+module github.com/plasmash/plasmactl-topology
 
 go 1.25.0
 

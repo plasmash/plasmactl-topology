@@ -1,6 +1,6 @@
-// Package chassis provides the Chassis type for managing platform chassis structure.
-// The chassis defines the skeleton of the platform - paths where nodes and components attach.
-package chassis
+// Package topology provides the Topology type for managing platform topology structure.
+// The topology defines the skeleton of the platform - paths where nodes and components attach.
+package topology
 
 import (
 	"fmt"
@@ -11,66 +11,66 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Chassis represents the platform chassis configuration.
+// Topology represents the platform topology configuration.
 // It preserves YAML order for consistent output.
-type Chassis struct {
+type Topology struct {
 	node *yaml.Node
 	data map[string]map[string][]interface{}
 }
 
 // YAMLNode returns the underlying YAML document node.
-func (c *Chassis) YAMLNode() *yaml.Node {
-	return c.node
+func (t *Topology) YAMLNode() *yaml.Node {
+	return t.node
 }
 
 // SetYAMLNode replaces the underlying YAML document node.
-func (c *Chassis) SetYAMLNode(n *yaml.Node) {
-	c.node = n
+func (t *Topology) SetYAMLNode(n *yaml.Node) {
+	t.node = n
 }
 
-// RawData returns the parsed chassis data structure.
-func (c *Chassis) RawData() map[string]map[string][]interface{} {
-	return c.data
+// RawData returns the parsed topology data structure.
+func (t *Topology) RawData() map[string]map[string][]interface{} {
+	return t.data
 }
 
-// SetRawData replaces the parsed chassis data structure.
-func (c *Chassis) SetRawData(d map[string]map[string][]interface{}) {
-	c.data = d
+// SetRawData replaces the parsed topology data structure.
+func (t *Topology) SetRawData(d map[string]map[string][]interface{}) {
+	t.data = d
 }
 
-// Load reads and parses chassis.yaml from the given directory.
-func Load(dir string) (*Chassis, error) {
-	path := filepath.Join(dir, "chassis.yaml")
+// Load reads and parses topology.yaml from the given directory.
+func Load(dir string) (*Topology, error) {
+	path := filepath.Join(dir, "topology.yaml")
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read chassis.yaml: %w", err)
+		return nil, fmt.Errorf("failed to read topology.yaml: %w", err)
 	}
 
 	var node yaml.Node
 	if err := yaml.Unmarshal(data, &node); err != nil {
-		return nil, fmt.Errorf("failed to parse chassis.yaml: %w", err)
+		return nil, fmt.Errorf("failed to parse topology.yaml: %w", err)
 	}
 
 	var parsed map[string]map[string][]interface{}
 	if err := yaml.Unmarshal(data, &parsed); err != nil {
-		return nil, fmt.Errorf("failed to parse chassis.yaml: %w", err)
+		return nil, fmt.Errorf("failed to parse topology.yaml: %w", err)
 	}
 
-	return &Chassis{
+	return &Topology{
 		node: &node,
 		data: parsed,
 	}, nil
 }
 
-// Flatten returns all chassis paths in tree traversal order.
+// Flatten returns all zone paths in tree traversal order.
 // Example output: ["platform", "platform.foundation", "platform.foundation.cluster", ...]
-func (c *Chassis) Flatten() []string {
-	if c.node == nil || len(c.node.Content) == 0 {
+func (t *Topology) Flatten() []string {
+	if t.node == nil || len(t.node.Content) == 0 {
 		return nil
 	}
 
 	var paths []string
-	rootNode := c.node.Content[0]
+	rootNode := t.node.Content[0]
 	if rootNode.Kind != yaml.MappingNode {
 		return nil
 	}
@@ -125,31 +125,31 @@ func flattenSequence(prefix string, node *yaml.Node) []string {
 	return paths
 }
 
-// Exists checks if a chassis path exists.
-func (c *Chassis) Exists(chassisPath string) bool {
-	for _, path := range c.Flatten() {
-		if path == chassisPath {
+// Exists checks if a zone path exists.
+func (t *Topology) Exists(zonePath string) bool {
+	for _, path := range t.Flatten() {
+		if path == zonePath {
 			return true
 		}
 	}
 	return false
 }
 
-// Root returns the root chassis name (e.g., "platform").
-func (c *Chassis) Root() string {
-	paths := c.Flatten()
+// Root returns the root zone name (e.g., "platform").
+func (t *Topology) Root() string {
+	paths := t.Flatten()
 	if len(paths) > 0 {
 		return paths[0]
 	}
 	return ""
 }
 
-// Children returns the direct children of a chassis path.
-func (c *Chassis) Children(chassisPath string) []string {
+// Children returns the direct children of a zone path.
+func (t *Topology) Children(zonePath string) []string {
 	var children []string
-	prefix := chassisPath + "."
+	prefix := zonePath + "."
 
-	for _, path := range c.Flatten() {
+	for _, path := range t.Flatten() {
 		if strings.HasPrefix(path, prefix) {
 			// Check it's a direct child (no more dots after prefix)
 			remainder := path[len(prefix):]
@@ -162,26 +162,26 @@ func (c *Chassis) Children(chassisPath string) []string {
 	return children
 }
 
-// ChildrenMap returns a map of chassis path to its direct children.
-func (c *Chassis) ChildrenMap() map[string][]string {
+// ChildrenMap returns a map of zone path to its direct children.
+func (t *Topology) ChildrenMap() map[string][]string {
 	result := make(map[string][]string)
 
-	for _, chassisPath := range c.Flatten() {
-		parent := Parent(chassisPath)
+	for _, zonePath := range t.Flatten() {
+		parent := Parent(zonePath)
 		if parent != "" {
-			result[parent] = append(result[parent], chassisPath)
+			result[parent] = append(result[parent], zonePath)
 		}
 	}
 
 	return result
 }
 
-// Ancestors returns all ancestors of a given chassis path.
+// Ancestors returns all ancestors of a given zone path.
 // Example: "platform.foundation.cluster.control" returns
 // ["platform.foundation.cluster", "platform.foundation", "platform"]
-func (c *Chassis) Ancestors(chassisPath string) []string {
+func (t *Topology) Ancestors(zonePath string) []string {
 	var ancestors []string
-	current := chassisPath
+	current := zonePath
 
 	for {
 		parent := Parent(current)
@@ -195,36 +195,36 @@ func (c *Chassis) Ancestors(chassisPath string) []string {
 	return ancestors
 }
 
-// AncestorsMap returns a map of chassis path to its ancestors.
-func (c *Chassis) AncestorsMap() map[string][]string {
+// AncestorsMap returns a map of zone path to its ancestors.
+func (t *Topology) AncestorsMap() map[string][]string {
 	result := make(map[string][]string)
 
-	for _, chassisPath := range c.Flatten() {
-		result[chassisPath] = c.Ancestors(chassisPath)
+	for _, zonePath := range t.Flatten() {
+		result[zonePath] = t.Ancestors(zonePath)
 	}
 
 	return result
 }
 
-// Parent returns the parent of a given chassis path.
+// Parent returns the parent of a given zone path.
 // Example: "platform.foundation.cluster" returns "platform.foundation"
 // Returns empty string for root paths.
-func Parent(chassisPath string) string {
-	idx := strings.LastIndex(chassisPath, ".")
+func Parent(zonePath string) string {
+	idx := strings.LastIndex(zonePath, ".")
 	if idx == -1 {
 		return ""
 	}
-	return chassisPath[:idx]
+	return zonePath[:idx]
 }
 
-// IsDescendantOf checks if chassisPath is a descendant of ancestor.
-func IsDescendantOf(chassisPath, ancestor string) bool {
-	return strings.HasPrefix(chassisPath, ancestor+".")
+// IsDescendantOf checks if zonePath is a descendant of ancestor.
+func IsDescendantOf(zonePath, ancestor string) bool {
+	return strings.HasPrefix(zonePath, ancestor+".")
 }
 
-// FlattenWithPrefix returns chassis paths that start with the given prefix.
-func (c *Chassis) FlattenWithPrefix(prefix string) []string {
-	all := c.Flatten()
+// FlattenWithPrefix returns zone paths that start with the given prefix.
+func (t *Topology) FlattenWithPrefix(prefix string) []string {
+	all := t.Flatten()
 	if prefix == "" {
 		return all
 	}
@@ -238,20 +238,20 @@ func (c *Chassis) FlattenWithPrefix(prefix string) []string {
 	return filtered
 }
 
-// ValidatePath checks that a chassis path is well-formed.
+// ValidatePath checks that a zone path is well-formed.
 // Segments must be non-empty and contain only lowercase letters, digits, hyphens, or underscores.
-func ValidatePath(chassisPath string) error {
-	if chassisPath == "" {
-		return fmt.Errorf("chassis path cannot be empty")
+func ValidatePath(zonePath string) error {
+	if zonePath == "" {
+		return fmt.Errorf("zone path cannot be empty")
 	}
-	parts := strings.Split(chassisPath, ".")
+	parts := strings.Split(zonePath, ".")
 	for i, part := range parts {
 		if part == "" {
-			return fmt.Errorf("chassis path has empty segment at position %d", i+1)
+			return fmt.Errorf("zone path has empty segment at position %d", i+1)
 		}
 		for _, r := range part {
 			if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
-				return fmt.Errorf("chassis path segment %q contains invalid character %q", part, string(r))
+				return fmt.Errorf("zone path segment %q contains invalid character %q", part, string(r))
 			}
 		}
 	}

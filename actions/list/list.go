@@ -6,32 +6,32 @@ import (
 
 	"github.com/launchrctl/launchr"
 	"github.com/launchrctl/launchr/pkg/action"
-	"github.com/plasmash/plasmactl-chassis/pkg/chassis"
+	"github.com/plasmash/plasmactl-topology/pkg/topology"
 	"github.com/plasmash/plasmactl-component/pkg/component"
 	"github.com/plasmash/plasmactl-node/pkg/node"
 )
 
-// TreeEntry enriches a chassis path with its allocated nodes and attached components.
+// TreeEntry enriches a zone path with its allocated nodes and attached components.
 type TreeEntry struct {
 	Path       string   `json:"path"`
 	Nodes      []string `json:"nodes,omitempty"`
 	Components []string `json:"components,omitempty"`
 }
 
-// ListResult is the structured output for chassis:list
+// ListResult is the structured output for topology:list
 type ListResult struct {
-	Chassis []string    `json:"chassis"`
-	Tree    []TreeEntry `json:"tree,omitempty"`
+	Zones []string    `json:"zones"`
+	Tree  []TreeEntry `json:"tree,omitempty"`
 }
 
-// List implements the chassis:list command
+// List implements the topology:list command
 type List struct {
 	action.WithLogger
 	action.WithTerm
 
-	Dir     string
-	Chassis string
-	Tree    bool
+	Dir  string
+	Zone string
+	Tree bool
 
 	result *ListResult
 }
@@ -43,28 +43,28 @@ func (l *List) Result() any {
 
 // Execute runs the list action
 func (l *List) Execute() error {
-	c, err := chassis.Load(l.Dir)
+	t, err := topology.Load(l.Dir)
 	if err != nil {
 		return err
 	}
 
 	// Initialize result early so --json always returns an object, never null
-	l.result = &ListResult{Chassis: []string{}}
+	l.result = &ListResult{Zones: []string{}}
 
-	paths := c.FlattenWithPrefix(l.Chassis)
+	paths := t.FlattenWithPrefix(l.Zone)
 	if len(paths) == 0 {
-		l.Term().Warning().Println("No chassis paths found")
+		l.Term().Warning().Println("No zone paths found")
 		return nil
 	}
 
-	l.result.Chassis = paths
+	l.result.Zones = paths
 
 	if l.Tree {
-		l.printTreeWithRelations(c, paths)
+		l.printTreeWithRelations(t, paths)
 	} else {
 		// Flat output - one per line, scriptable
-		for _, c := range l.result.Chassis {
-			l.Term().Printfln("%s", c)
+		for _, z := range l.result.Zones {
+			l.Term().Printfln("%s", z)
 		}
 	}
 
@@ -72,20 +72,20 @@ func (l *List) Execute() error {
 }
 
 
-// printTreeWithRelations prints the chassis tree with nodes (🖥) and components (🧩) inline
-func (l *List) printTreeWithRelations(c *chassis.Chassis, paths []string) {
+// printTreeWithRelations prints the topology tree with nodes and components inline
+func (l *List) printTreeWithRelations(t *topology.Topology, paths []string) {
 	// Load nodes and compute allocations
 	nodesByPlatform, err := node.LoadByPlatform(l.Dir)
 	if err != nil {
 		l.Log().Debug("Failed to load nodes", "error", err)
 	}
-	chassisToNodes := make(map[string][]string)
+	zoneToNodes := make(map[string][]string)
 
 	for _, nodes := range nodesByPlatform {
-		allocations := nodes.Allocations(c)
+		allocations := nodes.Allocations(t)
 		for _, n := range nodes {
-			for _, chassisPath := range allocations[n.Hostname] {
-				chassisToNodes[chassisPath] = append(chassisToNodes[chassisPath], n.DisplayName())
+			for _, zonePath := range allocations[n.Hostname] {
+				zoneToNodes[zonePath] = append(zoneToNodes[zonePath], n.DisplayName())
 			}
 		}
 	}
@@ -95,26 +95,26 @@ func (l *List) printTreeWithRelations(c *chassis.Chassis, paths []string) {
 	if err != nil {
 		l.Log().Debug("Failed to load components", "error", err)
 	}
-	chassisToComponents := make(map[string][]string)
+	zoneToComponents := make(map[string][]string)
 	for _, comp := range components {
-		chassisToComponents[comp.Chassis] = append(chassisToComponents[comp.Chassis], comp.Name)
+		zoneToComponents[comp.Zone] = append(zoneToComponents[comp.Zone], comp.Name)
 	}
 
 	// Sort the relations for consistent output
-	for chassisPath := range chassisToNodes {
-		sort.Strings(chassisToNodes[chassisPath])
+	for zonePath := range zoneToNodes {
+		sort.Strings(zoneToNodes[zonePath])
 	}
-	for chassisPath := range chassisToComponents {
-		sort.Strings(chassisToComponents[chassisPath])
+	for zonePath := range zoneToComponents {
+		sort.Strings(zoneToComponents[zonePath])
 	}
 
 	// Populate tree entries in result
 	for _, p := range paths {
 		entry := TreeEntry{Path: p}
-		if nodes, ok := chassisToNodes[p]; ok {
+		if nodes, ok := zoneToNodes[p]; ok {
 			entry.Nodes = nodes
 		}
-		if comps, ok := chassisToComponents[p]; ok {
+		if comps, ok := zoneToComponents[p]; ok {
 			entry.Components = comps
 		}
 		l.result.Tree = append(l.result.Tree, entry)
@@ -125,7 +125,7 @@ func (l *List) printTreeWithRelations(c *chassis.Chassis, paths []string) {
 
 	// Print tree starting from root's children
 	for _, child := range tree.children {
-		printNodeWithRelations(l.Term(), child, "", "", chassisToNodes, chassisToComponents)
+		printNodeWithRelations(l.Term(), child, "", "", zoneToNodes, zoneToComponents)
 	}
 }
 
@@ -168,19 +168,19 @@ func buildTree(paths []string) *treeNode {
 	return root
 }
 
-func printNodeWithRelations(term *launchr.Terminal, node *treeNode, indent, prefix string, chassisToNodes, chassisToComponents map[string][]string) {
+func printNodeWithRelations(term *launchr.Terminal, node *treeNode, indent, prefix string, zoneToNodes, zoneToComponents map[string][]string) {
 	// Print this node
 	term.Printfln("%s%s", prefix, node.name)
 
-	// Get nodes and components for this chassis path
-	nodes := chassisToNodes[node.fullPath]
-	comps := chassisToComponents[node.fullPath]
+	// Get nodes and components for this zone path
+	nodes := zoneToNodes[node.fullPath]
+	comps := zoneToComponents[node.fullPath]
 
-	// Order: child chassis paths first (structural hierarchy), then nodes, then components
+	// Order: child zone paths first (structural hierarchy), then nodes, then components
 	totalChildren := len(node.children) + len(nodes) + len(comps)
 	childIdx := 0
 
-	// Print child chassis paths first
+	// Print child zone paths first
 	for _, child := range node.children {
 		childIdx++
 		isLast := childIdx == totalChildren
@@ -194,10 +194,10 @@ func printNodeWithRelations(term *launchr.Terminal, node *treeNode, indent, pref
 			nextIndent = indent + "│   "
 		}
 
-		printNodeWithRelations(term, child, nextIndent, childPrefix, chassisToNodes, chassisToComponents)
+		printNodeWithRelations(term, child, nextIndent, childPrefix, zoneToNodes, zoneToComponents)
 	}
 
-	// Print nodes allocated to this chassis path
+	// Print nodes allocated to this zone path
 	for _, n := range nodes {
 		childIdx++
 		isLast := childIdx == totalChildren
@@ -210,7 +210,7 @@ func printNodeWithRelations(term *launchr.Terminal, node *treeNode, indent, pref
 		term.Printfln("%s🖥 %s", childPrefix, n)
 	}
 
-	// Print components distributed to this chassis path
+	// Print components distributed to this zone path
 	for _, comp := range comps {
 		childIdx++
 		isLast := childIdx == totalChildren

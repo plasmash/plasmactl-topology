@@ -5,26 +5,26 @@ import (
 	"strings"
 
 	"github.com/launchrctl/launchr/pkg/action"
-	"github.com/plasmash/plasmactl-chassis/internal/chassis"
+	"github.com/plasmash/plasmactl-topology/internal/topology"
 	"github.com/plasmash/plasmactl-node/pkg/node"
 )
 
-// RemoveResult is the structured result of chassis:remove.
+// RemoveResult is the structured result of topology:remove.
 type RemoveResult struct {
-	Chassis            string   `json:"chassis"`
+	Zone               string   `json:"zone"`
 	DryRun             bool     `json:"dry_run,omitempty"`
 	AllocatedNodes     []string `json:"allocated_nodes,omitempty"`
 	AttachedComponents []string `json:"attached_components,omitempty"`
 }
 
-// Remove implements the chassis:remove command
+// Remove implements the topology:remove command
 type Remove struct {
 	action.WithLogger
 	action.WithTerm
 
-	Dir     string
-	Chassis string
-	DryRun  bool
+	Dir    string
+	Zone   string
+	DryRun bool
 
 	result *RemoveResult
 }
@@ -36,13 +36,13 @@ func (r *Remove) Result() any {
 
 // Execute runs the remove action
 func (r *Remove) Execute() error {
-	c, err := chassis.Load(r.Dir)
+	t, err := topology.Load(r.Dir)
 	if err != nil {
 		return err
 	}
 
-	if !c.Exists(r.Chassis) {
-		return fmt.Errorf("chassis %q not found", r.Chassis)
+	if !t.Exists(r.Zone) {
+		return fmt.Errorf("zone %q not found", r.Zone)
 	}
 
 	// Check for allocated nodes using distributed allocations
@@ -53,10 +53,10 @@ func (r *Remove) Execute() error {
 
 	var allocatedNodes []string
 	for _, nodes := range nodesByPlatform {
-		allocations := nodes.Allocations(c.Chassis)
+		allocations := nodes.Allocations(t.Topology)
 		for _, n := range nodes {
-			for _, cp := range allocations[n.Hostname] {
-				if cp == r.Chassis || strings.HasPrefix(cp, r.Chassis+".") {
+			for _, zp := range allocations[n.Hostname] {
+				if zp == r.Zone || strings.HasPrefix(zp, r.Zone+".") {
 					allocatedNodes = append(allocatedNodes, n.DisplayName())
 					break
 				}
@@ -65,7 +65,7 @@ func (r *Remove) Execute() error {
 	}
 
 	// Check for attached components
-	attachments, err := chassis.LoadAttachments(r.Dir, r.Chassis)
+	attachments, err := topology.LoadAttachments(r.Dir, r.Zone)
 	if err != nil {
 		r.Log().Debug("Failed to load attachments", "error", err)
 	}
@@ -78,7 +78,7 @@ func (r *Remove) Execute() error {
 	// Dry-run: report what would block removal
 	if r.DryRun {
 		r.result = &RemoveResult{
-			Chassis:            r.Chassis,
+			Zone:               r.Zone,
 			DryRun:             true,
 			AllocatedNodes:     allocatedNodes,
 			AttachedComponents: attachedComponents,
@@ -98,7 +98,7 @@ func (r *Remove) Execute() error {
 			}
 		}
 		if len(allocatedNodes) == 0 && len(attachedComponents) == 0 {
-			r.Term().Success().Printfln("Safe to remove: %s", r.Chassis)
+			r.Term().Success().Printfln("Safe to remove: %s", r.Zone)
 		}
 		return nil
 	}
@@ -109,7 +109,7 @@ func (r *Remove) Execute() error {
 		for _, n := range allocatedNodes {
 			r.Term().Printfln("  %s", n)
 		}
-		return fmt.Errorf("cannot remove chassis %q: %d node(s) are allocated (deallocate them first)", r.Chassis, len(allocatedNodes))
+		return fmt.Errorf("cannot remove zone %q: %d node(s) are allocated (deallocate them first)", r.Zone, len(allocatedNodes))
 	}
 
 	if len(attachedComponents) > 0 {
@@ -117,19 +117,19 @@ func (r *Remove) Execute() error {
 		for _, comp := range attachedComponents {
 			r.Term().Printfln("  %s", comp)
 		}
-		return fmt.Errorf("cannot remove chassis %q: %d component(s) are attached (detach them first)", r.Chassis, len(attachedComponents))
+		return fmt.Errorf("cannot remove zone %q: %d component(s) are attached (detach them first)", r.Zone, len(attachedComponents))
 	}
 
 	// Safe to remove
-	if err := c.Remove(r.Chassis); err != nil {
+	if err := t.Remove(r.Zone); err != nil {
 		return err
 	}
 
-	if err := c.Save(r.Dir); err != nil {
+	if err := t.Save(r.Dir); err != nil {
 		return err
 	}
 
-	r.result = &RemoveResult{Chassis: r.Chassis}
-	r.Term().Success().Printfln("Removed: %s", r.Chassis)
+	r.result = &RemoveResult{Zone: r.Zone}
+	r.Term().Success().Printfln("Removed: %s", r.Zone)
 	return nil
 }

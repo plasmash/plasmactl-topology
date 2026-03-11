@@ -1,15 +1,15 @@
 runtime: plugin
 action:
   title: Rename
-  description: Rename a chassis path segment and update all allocations and attachments. Both paths must have the same depth (number of segments).
+  description: Rename a zone path segment and update all allocations and attachments. Both paths must have the same depth (number of segments).
   arguments:
     - name: old
       title: Old Path
-      description: Current chassis path
+      description: Current zone path
       required: true
     - name: new
       title: New Path
-      description: New chassis path
+      description: New zone path
       required: true
   options:
     - name: dir
@@ -28,17 +28,17 @@ action:
     properties:
       old:
         type: string
-        description: Previous chassis path
+        description: Previous zone path
       new:
         type: string
-        description: New chassis path
+        description: New zone path
       updated_attachments:
         type: array
-        description: Playbook files updated with new chassis path
+        description: Playbook files updated with new zone path
         items:
           type: string
       updated_allocations:
         type: array
-        description: Allocation files updated with new chassis path
+        description: Allocation files updated with new zone path
         items:
           type: string

@@ -1,4 +1,4 @@
-package chassis
+package topology
 
 import (
 	"os"
@@ -8,15 +8,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Attachment represents a component attached to a chassis path
+// Attachment represents a component attached to a zone path
 type Attachment struct {
 	Component string
 	Playbook  string
-	Chassis   string
+	Zone      string
 }
 
-// LoadAttachments scans playbooks for component attachments to a chassis path
-func LoadAttachments(dir, chassisPath string) ([]Attachment, error) {
+// LoadAttachments scans playbooks for component attachments to a zone path
+func LoadAttachments(dir, zonePath string) ([]Attachment, error) {
 	var attachments []Attachment
 
 	// Scan src/<layer>/<layer>.yaml playbooks
@@ -50,8 +50,8 @@ func LoadAttachments(dir, chassisPath string) ([]Attachment, error) {
 		}
 
 		for _, play := range plays {
-			// Match exact chassis path or children
-			if play.Hosts == chassisPath || strings.HasPrefix(play.Hosts, chassisPath+".") {
+			// Match exact zone path or children
+			if play.Hosts == zonePath || strings.HasPrefix(play.Hosts, zonePath+".") {
 				for _, r := range play.Roles {
 					var roleName string
 					switch role := r.(type) {
@@ -68,7 +68,7 @@ func LoadAttachments(dir, chassisPath string) ([]Attachment, error) {
 						attachments = append(attachments, Attachment{
 							Component: roleName,
 							Playbook:  playbookPath,
-							Chassis:   play.Hosts,
+							Zone:      play.Hosts,
 						})
 					}
 				}
@@ -79,17 +79,17 @@ func LoadAttachments(dir, chassisPath string) ([]Attachment, error) {
 	return attachments, nil
 }
 
-// HasAttachments checks if a chassis path has any component attachments
-func HasAttachments(dir, chassisPath string) (bool, []Attachment, error) {
-	attachments, err := LoadAttachments(dir, chassisPath)
+// HasAttachments checks if a zone path has any component attachments
+func HasAttachments(dir, zonePath string) (bool, []Attachment, error) {
+	attachments, err := LoadAttachments(dir, zonePath)
 	if err != nil {
 		return false, nil, err
 	}
 	return len(attachments) > 0, attachments, nil
 }
 
-// UpdateAttachments renames chassis path references in all playbooks
-func UpdateAttachments(dir, oldChassis, newChassis string) ([]string, error) {
+// UpdateAttachments renames zone path references in all playbooks
+func UpdateAttachments(dir, oldZone, newZone string) ([]string, error) {
 	var updatedFiles []string
 
 	srcDir := filepath.Join(dir, "src")
@@ -118,7 +118,7 @@ func UpdateAttachments(dir, oldChassis, newChassis string) ([]string, error) {
 			continue
 		}
 
-		updated := updateHostsInNode(&doc, oldChassis, newChassis)
+		updated := updateHostsInNode(&doc, oldZone, newZone)
 		if updated {
 			newData, err := yaml.Marshal(&doc)
 			if err != nil {
@@ -135,19 +135,19 @@ func UpdateAttachments(dir, oldChassis, newChassis string) ([]string, error) {
 }
 
 // updateHostsInNode recursively updates hosts fields in a yaml.Node
-func updateHostsInNode(node *yaml.Node, oldChassis, newChassis string) bool {
+func updateHostsInNode(node *yaml.Node, oldZone, newZone string) bool {
 	updated := false
 
 	switch node.Kind {
 	case yaml.DocumentNode:
 		for _, child := range node.Content {
-			if updateHostsInNode(child, oldChassis, newChassis) {
+			if updateHostsInNode(child, oldZone, newZone) {
 				updated = true
 			}
 		}
 	case yaml.SequenceNode:
 		for _, child := range node.Content {
-			if updateHostsInNode(child, oldChassis, newChassis) {
+			if updateHostsInNode(child, oldZone, newZone) {
 				updated = true
 			}
 		}
@@ -158,15 +158,15 @@ func updateHostsInNode(node *yaml.Node, oldChassis, newChassis string) bool {
 
 			if key.Value == "hosts" && value.Kind == yaml.ScalarNode {
 				// Check for exact match or prefix match
-				if value.Value == oldChassis {
-					value.Value = newChassis
+				if value.Value == oldZone {
+					value.Value = newZone
 					updated = true
-				} else if strings.HasPrefix(value.Value, oldChassis+".") {
-					value.Value = newChassis + value.Value[len(oldChassis):]
+				} else if strings.HasPrefix(value.Value, oldZone+".") {
+					value.Value = newZone + value.Value[len(oldZone):]
 					updated = true
 				}
 			} else {
-				if updateHostsInNode(value, oldChassis, newChassis) {
+				if updateHostsInNode(value, oldZone, newZone) {
 					updated = true
 				}
 			}
@@ -176,8 +176,8 @@ func updateHostsInNode(node *yaml.Node, oldChassis, newChassis string) bool {
 	return updated
 }
 
-// UpdateAllocations renames chassis path references in all node files
-func UpdateAllocations(dir, oldChassis, newChassis string) ([]string, error) {
+// UpdateAllocations renames zone path references in all node files
+func UpdateAllocations(dir, oldZone, newZone string) ([]string, error) {
 	var updatedFiles []string
 
 	instDir := filepath.Join(dir, "inst")
@@ -217,7 +217,7 @@ func UpdateAllocations(dir, oldChassis, newChassis string) ([]string, error) {
 				continue
 			}
 
-			updated := updateChassisInNode(&doc, oldChassis, newChassis)
+			updated := updateZoneInNode(&doc, oldZone, newZone)
 			if updated {
 				newData, err := yaml.Marshal(&doc)
 				if err != nil {
@@ -234,14 +234,14 @@ func UpdateAllocations(dir, oldChassis, newChassis string) ([]string, error) {
 	return updatedFiles, nil
 }
 
-// updateChassisInNode updates chassis array entries in a yaml.Node
-func updateChassisInNode(node *yaml.Node, oldChassis, newChassis string) bool {
+// updateZoneInNode updates zones array entries in a yaml.Node
+func updateZoneInNode(node *yaml.Node, oldZone, newZone string) bool {
 	updated := false
 
 	switch node.Kind {
 	case yaml.DocumentNode:
 		for _, child := range node.Content {
-			if updateChassisInNode(child, oldChassis, newChassis) {
+			if updateZoneInNode(child, oldZone, newZone) {
 				updated = true
 			}
 		}
@@ -250,21 +250,21 @@ func updateChassisInNode(node *yaml.Node, oldChassis, newChassis string) bool {
 			key := node.Content[i]
 			value := node.Content[i+1]
 
-			if key.Value == "chassis" && value.Kind == yaml.SequenceNode {
-				// Update chassis array entries
+			if key.Value == "zones" && value.Kind == yaml.SequenceNode {
+				// Update zones array entries
 				for _, item := range value.Content {
 					if item.Kind == yaml.ScalarNode {
-						if item.Value == oldChassis {
-							item.Value = newChassis
+						if item.Value == oldZone {
+							item.Value = newZone
 							updated = true
-						} else if strings.HasPrefix(item.Value, oldChassis+".") {
-							item.Value = newChassis + item.Value[len(oldChassis):]
+						} else if strings.HasPrefix(item.Value, oldZone+".") {
+							item.Value = newZone + item.Value[len(oldZone):]
 							updated = true
 						}
 					}
 				}
 			} else {
-				if updateChassisInNode(value, oldChassis, newChassis) {
+				if updateZoneInNode(value, oldZone, newZone) {
 					updated = true
 				}
 			}

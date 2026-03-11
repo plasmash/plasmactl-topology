@@ -1,5 +1,5 @@
-// Package plasmactlchassis implements a launchr plugin with chassis management functionality
-package plasmactlchassis
+// Package plasmactltopology implements a launchr plugin with topology management functionality
+package plasmactltopology
 
 import (
 	"context"
@@ -8,12 +8,12 @@ import (
 	"github.com/launchrctl/launchr"
 	"github.com/launchrctl/launchr/pkg/action"
 
-	"github.com/plasmash/plasmactl-chassis/actions/add"
-	"github.com/plasmash/plasmactl-chassis/actions/list"
-	"github.com/plasmash/plasmactl-chassis/actions/query"
-	"github.com/plasmash/plasmactl-chassis/actions/remove"
-	"github.com/plasmash/plasmactl-chassis/actions/rename"
-	"github.com/plasmash/plasmactl-chassis/actions/show"
+	"github.com/plasmash/plasmactl-topology/actions/add"
+	"github.com/plasmash/plasmactl-topology/actions/list"
+	"github.com/plasmash/plasmactl-topology/actions/query"
+	"github.com/plasmash/plasmactl-topology/actions/remove"
+	"github.com/plasmash/plasmactl-topology/actions/rename"
+	"github.com/plasmash/plasmactl-topology/actions/show"
 )
 
 //go:embed actions/*/*.yaml
@@ -23,7 +23,7 @@ func init() {
 	launchr.RegisterPlugin(&Plugin{})
 }
 
-// Plugin is [launchr.Plugin] plugin providing chassis management functionality.
+// Plugin is [launchr.Plugin] plugin providing topology management functionality.
 type Plugin struct {
 	cfg launchr.Config
 }
@@ -41,7 +41,7 @@ func (p *Plugin) OnAppInit(app launchr.App) error {
 	return nil
 }
 
-// actionRunner is implemented by all chassis action structs.
+// actionRunner is implemented by all topology action structs.
 type actionRunner interface {
 	SetLogger(*launchr.Logger)
 	SetTerm(*launchr.Terminal)
@@ -91,36 +91,36 @@ func argString(input *action.Input, name string) string {
 // DiscoverActions implements [launchr.ActionDiscoveryPlugin] interface.
 func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 	return []*action.Action{
-		createAction("actions/list/list.yaml", "chassis:list", func(input *action.Input) actionRunner {
+		createAction("actions/list/list.yaml", "topology:list", func(input *action.Input) actionRunner {
 			return &list.List{
-				Dir:     optString(input, "dir"),
-				Chassis: argString(input, "chassis"),
-				Tree:    optBool(input, "tree"),
+				Dir:  optString(input, "dir"),
+				Zone: argString(input, "zone"),
+				Tree: optBool(input, "tree"),
 			}
 		}),
-		createAction("actions/show/show.yaml", "chassis:show", func(input *action.Input) actionRunner {
+		createAction("actions/show/show.yaml", "topology:show", func(input *action.Input) actionRunner {
 			return &show.Show{
 				Dir:      optString(input, "dir"),
-				Chassis:  argString(input, "chassis"),
+				Zone:     argString(input, "zone"),
 				Platform: optString(input, "platform"),
 				Kind:     optString(input, "kind"),
 			}
 		}),
-		createAction("actions/add/add.yaml", "chassis:add", func(input *action.Input) actionRunner {
+		createAction("actions/add/add.yaml", "topology:add", func(input *action.Input) actionRunner {
 			return &add.Add{
-				Dir:     optString(input, "dir"),
-				Chassis: input.Arg("chassis").(string),
-				Force:   optBool(input, "force"),
+				Dir:   optString(input, "dir"),
+				Zone:  input.Arg("zone").(string),
+				Force: optBool(input, "force"),
 			}
 		}),
-		createAction("actions/remove/remove.yaml", "chassis:remove", func(input *action.Input) actionRunner {
+		createAction("actions/remove/remove.yaml", "topology:remove", func(input *action.Input) actionRunner {
 			return &remove.Remove{
-				Dir:     optString(input, "dir"),
-				Chassis: input.Arg("chassis").(string),
-				DryRun:  optBool(input, "dry-run"),
+				Dir:    optString(input, "dir"),
+				Zone:   input.Arg("zone").(string),
+				DryRun: optBool(input, "dry-run"),
 			}
 		}),
-		createAction("actions/rename/rename.yaml", "chassis:rename", func(input *action.Input) actionRunner {
+		createAction("actions/rename/rename.yaml", "topology:rename", func(input *action.Input) actionRunner {
 			return &rename.Rename{
 				Dir:    optString(input, "dir"),
 				Old:    input.Arg("old").(string),
@@ -128,7 +128,7 @@ func (p *Plugin) DiscoverActions(_ context.Context) ([]*action.Action, error) {
 				DryRun: optBool(input, "dry-run"),
 			}
 		}),
-		createAction("actions/query/query.yaml", "chassis:query", func(input *action.Input) actionRunner {
+		createAction("actions/query/query.yaml", "topology:query", func(input *action.Input) actionRunner {
 			return &query.Query{
 				Dir:        optString(input, "dir"),
 				Identifier: input.Arg("identifier").(string),

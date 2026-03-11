@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/launchrctl/launchr/pkg/action"
-	"github.com/plasmash/plasmactl-chassis/pkg/chassis"
+	"github.com/plasmash/plasmactl-topology/pkg/topology"
 	"github.com/plasmash/plasmactl-component/pkg/component"
 	"github.com/plasmash/plasmactl-node/pkg/node"
 )
@@ -15,7 +15,7 @@ import (
 type AllocationInfo struct {
 	Node     string   `json:"node"`
 	Platform string   `json:"platform"`
-	Chassis  []string `json:"chassis"`
+	Zones    []string `json:"zones"`
 }
 
 // DisplayName returns the node formatted as "hostname@platform".
@@ -27,7 +27,7 @@ func (a AllocationInfo) DisplayName() string {
 type AttachmentInfo struct {
 	Component string `json:"component"`
 	Version   string `json:"version,omitempty"`
-	Chassis   string `json:"chassis"`
+	Zone      string `json:"zone"`
 }
 
 // DisplayName returns the component formatted as "name@version".
@@ -35,20 +35,20 @@ func (a AttachmentInfo) DisplayName() string {
 	return component.FormatDisplayName(a.Component, a.Version)
 }
 
-// ShowResult is the structured output for chassis:show
+// ShowResult is the structured output for topology:show
 type ShowResult struct {
-	Chassis     string           `json:"chassis,omitempty"`
+	Zone        string           `json:"zone,omitempty"`
 	Allocations []AllocationInfo `json:"allocations,omitempty"`
 	Attachments []AttachmentInfo `json:"attachments,omitempty"`
 }
 
-// Show implements the chassis:show command
+// Show implements the topology:show command
 type Show struct {
 	action.WithLogger
 	action.WithTerm
 
 	Dir      string
-	Chassis  string
+	Zone     string
 	Platform string
 	Kind     string // "allocations" or "attachments" to filter
 
@@ -62,14 +62,14 @@ func (s *Show) Result() any {
 
 // Execute runs the show action
 func (s *Show) Execute() error {
-	c, err := chassis.Load(s.Dir)
+	t, err := topology.Load(s.Dir)
 	if err != nil {
 		return err
 	}
 
-	// If chassis path specified, validate it exists
-	if s.Chassis != "" && !c.Exists(s.Chassis) {
-		return fmt.Errorf("chassis %q not found in chassis.yaml", s.Chassis)
+	// If zone path specified, validate it exists
+	if s.Zone != "" && !t.Exists(s.Zone) {
+		return fmt.Errorf("zone %q not found in topology.yaml", s.Zone)
 	}
 
 	showAllocations := s.Kind == "" || s.Kind == "allocations"
@@ -102,23 +102,23 @@ func (s *Show) Execute() error {
 		versionMap[comp.Name] = comp.Version
 	}
 
-	// Get attachments map (component → chassis paths)
-	attachmentsMap := components.Attachments(c)
+	// Get attachments map (component -> zone paths)
+	attachmentsMap := components.Attachments(t)
 
-	// Collect component attachments for the chassis path
+	// Collect component attachments for the zone path
 	type componentInfo struct {
-		chassis   string
+		zone      string
 		component string
 		version   string
 	}
 	var compInfos []componentInfo
 
-	for compName, chassisPaths := range attachmentsMap {
-		for _, chassisPath := range chassisPaths {
-			// Check if chassis path matches query (exact match or descendant)
-			if s.Chassis == "" || chassisPath == s.Chassis || chassis.IsDescendantOf(chassisPath, s.Chassis) {
+	for compName, zonePaths := range attachmentsMap {
+		for _, zonePath := range zonePaths {
+			// Check if zone path matches query (exact match or descendant)
+			if s.Zone == "" || zonePath == s.Zone || topology.IsDescendantOf(zonePath, s.Zone) {
 				compInfos = append(compInfos, componentInfo{
-					chassis:   chassisPath,
+					zone:      zonePath,
 					component: compName,
 					version:   versionMap[compName],
 				})
@@ -126,10 +126,10 @@ func (s *Show) Execute() error {
 		}
 	}
 
-	// Sort components by chassis path, then component name
+	// Sort components by zone path, then component name
 	sort.Slice(compInfos, func(i, j int) bool {
-		if compInfos[i].chassis != compInfos[j].chassis {
-			return compInfos[i].chassis < compInfos[j].chassis
+		if compInfos[i].zone != compInfos[j].zone {
+			return compInfos[i].zone < compInfos[j].zone
 		}
 		return compInfos[i].component < compInfos[j].component
 	})
@@ -138,7 +138,7 @@ func (s *Show) Execute() error {
 	type nodeInfo struct {
 		platform string
 		node     string
-		chassis  []string // effective chassis paths after distribution
+		zones    []string // effective zone paths after distribution
 	}
 	var nodes []nodeInfo
 
@@ -153,16 +153,16 @@ func (s *Show) Execute() error {
 		platformNodes := nodesByPlatform[platform]
 
 		// Compute effective allocations for all nodes in this platform
-		allocations := platformNodes.Allocations(c)
+		allocations := platformNodes.Allocations(t)
 
 		for _, n := range platformNodes {
-			effectiveChassis := allocations[n.Hostname]
+			effectiveZones := allocations[n.Hostname]
 
-			// If chassis filter is specified, check if node is allocated to it
-			if s.Chassis != "" {
+			// If zone filter is specified, check if node is allocated to it
+			if s.Zone != "" {
 				found := false
-				for _, chassisPath := range effectiveChassis {
-					if chassisPath == s.Chassis || chassis.IsDescendantOf(chassisPath, s.Chassis) {
+				for _, zonePath := range effectiveZones {
+					if zonePath == s.Zone || topology.IsDescendantOf(zonePath, s.Zone) {
 						found = true
 						break
 					}
@@ -175,7 +175,7 @@ func (s *Show) Execute() error {
 			nodes = append(nodes, nodeInfo{
 				platform: platform,
 				node:     n.Hostname,
-				chassis:  effectiveChassis,
+				zones:    effectiveZones,
 			})
 		}
 	}
@@ -190,14 +190,14 @@ func (s *Show) Execute() error {
 
 	// Build result
 	s.result = &ShowResult{
-		Chassis: s.Chassis,
+		Zone: s.Zone,
 	}
 
 	for _, n := range nodes {
 		s.result.Allocations = append(s.result.Allocations, AllocationInfo{
 			Node:     n.node,
 			Platform: n.platform,
-			Chassis:  n.chassis,
+			Zones:    n.zones,
 		})
 	}
 
@@ -205,7 +205,7 @@ func (s *Show) Execute() error {
 		s.result.Attachments = append(s.result.Attachments, AttachmentInfo{
 			Component: comp.component,
 			Version:   comp.version,
-			Chassis:   comp.chassis,
+			Zone:      comp.zone,
 		})
 	}
 
@@ -221,18 +221,18 @@ func (s *Show) Execute() error {
 	if hasAllocations {
 		s.Term().Info().Printfln("Allocations (%d nodes)", len(s.result.Allocations))
 		for _, n := range s.result.Allocations {
-			chassisStr := strings.Join(n.Chassis, ", ")
-			if len(chassisStr) > 60 {
-				chassisStr = chassisStr[:57] + "..."
+			zonesStr := strings.Join(n.Zones, ", ")
+			if len(zonesStr) > 60 {
+				zonesStr = zonesStr[:57] + "..."
 			}
-			s.Term().Printfln("  %s  [%s]", n.DisplayName(), chassisStr)
+			s.Term().Printfln("  %s  [%s]", n.DisplayName(), zonesStr)
 		}
 	}
 
 	if hasAttachments {
 		s.Term().Info().Printfln("Attachments (%d components)", len(s.result.Attachments))
 		for _, a := range s.result.Attachments {
-			s.Term().Printfln("  %s  @ %s", a.DisplayName(), a.Chassis)
+			s.Term().Printfln("  %s  @ %s", a.DisplayName(), a.Zone)
 		}
 	}
 

@@ -4,22 +4,22 @@ import (
 	"fmt"
 
 	"github.com/launchrctl/launchr/pkg/action"
-	"github.com/plasmash/plasmactl-chassis/internal/chassis"
+	"github.com/plasmash/plasmactl-topology/internal/topology"
 )
 
-// AddResult is the structured result of chassis:add.
+// AddResult is the structured result of topology:add.
 type AddResult struct {
-	Chassis string `json:"chassis"`
+	Zone string `json:"zone"`
 }
 
-// Add implements the chassis:add command
+// Add implements the topology:add command
 type Add struct {
 	action.WithLogger
 	action.WithTerm
 
-	Dir     string
-	Chassis string
-	Force   bool
+	Dir   string
+	Zone  string
+	Force bool
 
 	result *AddResult
 }
@@ -31,26 +31,26 @@ func (a *Add) Result() any {
 
 // Execute runs the add action
 func (a *Add) Execute() error {
-	c, err := chassis.Load(a.Dir)
+	t, err := topology.Load(a.Dir)
 	if err != nil {
 		return err
 	}
 
-	if a.Force && c.Exists(a.Chassis) {
-		a.result = &AddResult{Chassis: a.Chassis}
-		a.Term().Info().Printfln("Already exists: %s", a.Chassis)
+	if a.Force && t.Exists(a.Zone) {
+		a.result = &AddResult{Zone: a.Zone}
+		a.Term().Info().Printfln("Already exists: %s", a.Zone)
 		return nil
 	}
 
-	if err := c.Add(a.Chassis); err != nil {
-		return fmt.Errorf("failed to add chassis path: %w", err)
+	if err := t.Add(a.Zone); err != nil {
+		return fmt.Errorf("failed to add zone path: %w", err)
 	}
 
-	if err := c.Save(a.Dir); err != nil {
+	if err := t.Save(a.Dir); err != nil {
 		return err
 	}
 
-	a.result = &AddResult{Chassis: a.Chassis}
-	a.Term().Success().Printfln("Added: %s", a.Chassis)
+	a.result = &AddResult{Zone: a.Zone}
+	a.Term().Success().Printfln("Added: %s", a.Zone)
 	return nil
 }
